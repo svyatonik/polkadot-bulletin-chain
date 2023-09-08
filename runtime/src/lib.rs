@@ -49,6 +49,8 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
+mod bridge_config;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -376,6 +378,10 @@ construct_runtime!(
 		Grandpa: pallet_grandpa,
 		Sudo: pallet_sudo,
 		TransactionStorage: pallet_transaction_storage,
+		// Bridge pallets
+		BridgePolkadotGrandpa: pallet_bridge_grandpa,
+		BridgePolkadotParachains: pallet_bridge_parachains,
+		BridgePolkadotBridgeHubMessages: pallet_bridge_messages,
 	}
 );
 

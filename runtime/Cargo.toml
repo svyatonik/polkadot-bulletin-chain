@@ -52,6 +52,19 @@ frame-system-benchmarking = { version = "4.0.0-dev", default-features = false, g
 pallet-transaction-storage = { version = "4.0.0-dev", default-features = false, path = "../pallets/transaction-storage" }
 pallet-validator-set = { version = "1.0.0", default-features = false, path = "../pallets/validator-set" }
 
+# Bridge dependencies
+bp-bridge-hub-polkadot = { path = "../bridges/primitives/chain-bridge-hub-polkadot", default-features = false }
+bp-header-chain = { path = "../bridges/primitives/header-chain", default-features = false }
+bp-messages = { path = "../bridges/primitives/messages", default-features = false }
+bp-parachains = { path = "../bridges/primitives/parachains", default-features = false }
+bp-polkadot = { path = "../bridges/primitives/chain-polkadot", default-features = false }
+bp-polkadot-core = { path = "../bridges/primitives/polkadot-core", default-features = false }
+bp-runtime = { path = "../bridges/primitives/runtime", default-features = false }
+bridge-runtime-common = { path = "../bridges/bin/runtime-common", default-features = false }
+pallet-bridge-grandpa = { path = "../bridges/modules/grandpa", default-features = false }
+pallet-bridge-parachains = { path = "../bridges/modules/parachains", default-features = false }
+pallet-bridge-messages = { path = "../bridges/modules/messages", default-features = false }
+
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", optional = true, branch = "polkadot-v1.0.0" }
 
@@ -94,6 +107,18 @@ std = [
 
 	"pallet-transaction-storage/std",
 	"pallet-validator-set/std",
+
+	"bp-bridge-hub-polkadot/std",
+	"bp-header-chain/std",
+	"bp-messages/std",
+	"bp-parachains/std",
+	"bp-polkadot/std",
+	"bp-polkadot-core/std",
+	"bp-runtime/std",
+	"bridge-runtime-common/std",
+	"pallet-bridge-grandpa/std",
+	"pallet-bridge-parachains/std",
+	"pallet-bridge-messages/std",
 
 	"substrate-wasm-builder",
 ]

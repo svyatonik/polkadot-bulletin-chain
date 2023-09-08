@@ -1,6 +1,6 @@
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use polkadot_bulletin_chain_runtime::{
-	opaque::SessionKeys, AccountId, BabeConfig, RuntimeGenesisConfig, SessionConfig, Signature,
+	opaque::SessionKeys, AccountId, BabeConfig, BridgePolkadotGrandpaConfig, BridgePolkadotParachainsConfig, BridgePolkadotBridgeHubMessagesConfig, RuntimeGenesisConfig, SessionConfig, Signature,
 	SudoConfig, SystemConfig, ValidatorSetConfig, BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };
 use sc_service::ChainType;
@@ -148,7 +148,19 @@ fn testnet_genesis(
 		im_online: Default::default(),
 		sudo: SudoConfig {
 			// Assign network admin rights.
-			key: Some(root_key),
+			key: Some(root_key.clone()),
+		},
+		bridge_polkadot_grandpa: BridgePolkadotGrandpaConfig {
+			owner: Some(root_key.clone()),
+			..Default::default()
+		},
+		bridge_polkadot_parachains: BridgePolkadotParachainsConfig {
+			owner: Some(root_key.clone()),
+			..Default::default()
+		},
+		bridge_polkadot_bridge_hub_messages: BridgePolkadotBridgeHubMessagesConfig {
+			owner: Some(root_key),
+			..Default::default()
 		},
 	}
 }
