@@ -58,6 +58,7 @@ bp-header-chain = { path = "../bridges/primitives/header-chain", default-feature
 bp-messages = { path = "../bridges/primitives/messages", default-features = false }
 bp-parachains = { path = "../bridges/primitives/parachains", default-features = false }
 bp-polkadot = { path = "../bridges/primitives/chain-polkadot", default-features = false }
+bp-polkadot-bulletin = { path = "../bridges/primitives/chain-polkadot-bulletin", default-features = false }
 bp-polkadot-core = { path = "../bridges/primitives/polkadot-core", default-features = false }
 bp-runtime = { path = "../bridges/primitives/runtime", default-features = false }
 bridge-runtime-common = { path = "../bridges/bin/runtime-common", default-features = false }
@@ -113,6 +114,7 @@ std = [
 	"bp-messages/std",
 	"bp-parachains/std",
 	"bp-polkadot/std",
+	"bp-polkadot-bulletin/std",
 	"bp-polkadot-core/std",
 	"bp-runtime/std",
 	"bridge-runtime-common/std",

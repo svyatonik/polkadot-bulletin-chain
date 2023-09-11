@@ -18,67 +18,6 @@ use frame_support::{RuntimeDebug, parameter_types};
 /// Lane that we are using to send and receive messages.
 pub const XCM_LANE: LaneId = LaneId([0, 0, 0, 0]);
 
-// TODO: separate crate in bridges repo
-pub mod bp_polkadot_bulletin_chain {
-	pub use bp_polkadot_core::*;
-	use bp_header_chain::ChainWithGrandpa;
-	use bp_messages::MessageNonce;
-	use bp_runtime::Chain;
-	use frame_support::{weights::{DispatchClass, Weight}, RuntimeDebug};
-
-	/// Name of the With-Polkadot Bulletin Chain GRANDPA pallet instance that is deployed at bridged chains.
-	pub const WITH_POLKADOT_BULLETIN_CHAIN_GRANDPA_PALLET_NAME: &str = "BridgePolkadotBulletinChainGrandpa";
-	/// Name of the with-Bulletin Chain messages pallet used at other chain runtimes.
-	pub const WITH_POLKADOT_BULLETIN_CHAIN_MESSAGES_PALLET_NAME: &'static str = "WithPolkadotBulletinChainMessages";
-
-	/// Maximal number of unrewarded relayer entries at inbound lane for Bulletin Chain.
-	/// Note: this value is security-relevant, decreasing it should not be done without careful
-	/// analysis (like the one above).
-	pub const MAX_UNREWARDED_RELAYERS_IN_CONFIRMATION_TX: MessageNonce = 1024;
-
-	/// Maximal number of unconfirmed messages at inbound lane for Bulletin Chain.
-	/// Note: this value is security-relevant, decreasing it should not be done without careful
-	/// analysis (like the one above).
-	pub const MAX_UNCONFIRMED_MESSAGES_IN_CONFIRMATION_TX: MessageNonce = 4096;
-
-	/// Polkadot Bulletin Chain declaration.
-	#[derive(RuntimeDebug)]
-	pub struct PolkadotBulletinChain;
-
-	impl Chain for PolkadotBulletinChain {
-		type BlockNumber = <PolkadotLike as Chain>::BlockNumber;
-		type Hash = <PolkadotLike as Chain>::Hash;
-		type Hasher = <PolkadotLike as Chain>::Hasher;
-		type Header = <PolkadotLike as Chain>::Header;
-	
-		type AccountId = <PolkadotLike as Chain>::AccountId;
-		type Balance = <PolkadotLike as Chain>::Balance;
-		type Nonce = <PolkadotLike as Chain>::Nonce;
-		type Signature = <PolkadotLike as Chain>::Signature;
-
-		// TODO: when porting to parity-bridges-common, check if we can reuse polkadot weight/size limits
-
-		fn max_extrinsic_size() -> u32 {
-			*crate::BlockLength::get().max.get(DispatchClass::Normal)
-		}
-
-		fn max_extrinsic_weight() -> Weight {
-			crate::BlockWeights::get()
-				.get(DispatchClass::Normal)
-				.max_extrinsic
-				.unwrap_or(Weight::MAX)
-		}
-	}
-
-	impl ChainWithGrandpa for PolkadotBulletinChain {
-		const WITH_CHAIN_GRANDPA_PALLET_NAME: &'static str = WITH_POLKADOT_BULLETIN_CHAIN_GRANDPA_PALLET_NAME;
-		const MAX_AUTHORITIES_COUNT: u32 = MAX_AUTHORITIES_COUNT;
-		const REASONABLE_HEADERS_IN_JUSTIFICATON_ANCESTRY: u32 = REASONABLE_HEADERS_IN_JUSTIFICATON_ANCESTRY;
-		const MAX_HEADER_SIZE: u32 = MAX_HEADER_SIZE;
-		const AVERAGE_HEADER_SIZE_IN_JUSTIFICATION: u32 = AVERAGE_HEADER_SIZE_IN_JUSTIFICATION;
-	}
-}
-
 parameter_types! {
 	/// A number of Polkadot mandatory headers that are accepted for free at every
 	/// **this chain** block.
@@ -163,7 +102,7 @@ pub struct WithBridgeHubPolkadotMessageBridge;
 
 impl MessageBridge for WithBridgeHubPolkadotMessageBridge {
 	const BRIDGED_MESSAGES_PALLET_NAME: &'static str =
-		bp_polkadot_bulletin_chain::WITH_POLKADOT_BULLETIN_CHAIN_MESSAGES_PALLET_NAME;
+		bp_polkadot_bulletin::WITH_POLKADOT_BULLETIN_MESSAGES_PALLET_NAME;
 	type ThisChain = PolkadotBulletinChain;
 	type BridgedChain = BridgeHubPolkadot;
 	type BridgedHeaderChain = pallet_bridge_parachains::ParachainHeaders<
@@ -188,7 +127,7 @@ impl BridgedChainWithMessages for BridgeHubPolkadot {}
 pub struct PolkadotBulletinChain;
 
 impl UnderlyingChainProvider for PolkadotBulletinChain {
-	type Chain = bp_polkadot_bulletin_chain::PolkadotBulletinChain;
+	type Chain = bp_polkadot_bulletin::PolkadotBulletin;
 }
 
 impl ThisChainWithMessages for PolkadotBulletinChain {
