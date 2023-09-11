@@ -14,11 +14,19 @@ use bridge_runtime_common::{
 	messages_xcm_extension::XcmAsPlainPayload,
 };
 use frame_support::{RuntimeDebug, parameter_types};
+use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidity};
+use sp_std::vec::Vec;
 
 /// Lane that we are using to send and receive messages.
 pub const XCM_LANE: LaneId = LaneId([0, 0, 0, 0]);
 
 parameter_types! {
+	/// A set of message relayers, who are able to submit message delivery transactions
+	/// and physically deliver messages on this chain.
+	///
+	/// It can be changed by the governance later.
+	pub storage WhitelistedRelayers: Vec<AccountId> = Vec::new();
+
 	/// A number of Polkadot mandatory headers that are accepted for free at every
 	/// **this chain** block.
 	pub const MaxFreePolkadotHeadersPerBlock: u32 = 4;
@@ -132,4 +140,53 @@ impl UnderlyingChainProvider for PolkadotBulletinChain {
 
 impl ThisChainWithMessages for PolkadotBulletinChain {
 	type RuntimeOrigin = RuntimeOrigin;
+}
+
+/// Ensure that the account provided is the whitelisted relayer account.
+pub fn ensure_whitelisted_relayer(who: &AccountId) -> TransactionValidity {
+	if !WhitelistedRelayers::get().contains(who) {
+		return Err(InvalidTransaction::BadSigner.into());
+	}
+
+	Ok(Default::default())
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn may_change_whitelisted_relayers_set_using_sudo() {
+		// TODO
+	}
+
+	#[test]
+	fn whitelisted_relayer_may_submit_polkadot_headers() {
+		// TODO
+	}
+
+	#[test]
+	fn regular_account_can_not_submit_polkadot_headers() {
+		// TODO
+	}
+
+	#[test]
+	fn whitelisted_relayer_may_submit_polkadot_bridge_hub_headers() {
+		// TODO
+	}
+
+	#[test]
+	fn regular_account_can_not_submit_polkadot_bridge_hub_headers() {
+		// TODO
+	}
+
+	#[test]
+	fn whitelisted_relayer_may_submit_messages_and_confirmations_from_polkadot_bridge_hub() {
+		// TODO
+	}
+
+	#[test]
+	fn regular_account_can_not_submit_messages_and_confirmations_from_polkadot_bridge_hub() {
+		// TODO
+	}
 }

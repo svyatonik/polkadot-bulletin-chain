@@ -7,6 +7,9 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use frame_system::EnsureRoot;
+use pallet_bridge_grandpa::Call as BridgeGrandpaCall;
+use pallet_bridge_messages::Call as BridgeMessagesCall;
+use pallet_bridge_parachains::Call as BridgeParachainsCall;
 use pallet_grandpa::AuthorityId as GrandpaId;
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use sp_api::impl_runtime_apis;
@@ -443,6 +446,11 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::Sudo(_) => validate_sudo(who).map(|_| ()),
 			Self::Call::Session(pallet_session::Call::<Runtime>::set_keys { .. }) =>
 				ValidatorSet::pre_dispatch_set_keys(who),
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. })
+				| Self::Call::BridgePolkadotParachains(BridgeParachainsCall::submit_parachain_heads { .. })
+				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_proof { .. })
+				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_delivery_proof { .. })
+				=> bridge_config::ensure_whitelisted_relayer(who).map(|_| ()),
 			_ => Err(InvalidTransaction::Call.into()),
 		}
 	}
@@ -463,6 +471,11 @@ impl SignedExtension for ValidateSigned {
 					longevity: SetKeysLongevity::get(),
 					..Default::default()
 				}),
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. })
+				| Self::Call::BridgePolkadotParachains(BridgeParachainsCall::submit_parachain_heads { .. })
+				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_proof { .. })
+				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_delivery_proof { .. })
+				=> bridge_config::ensure_whitelisted_relayer(who),
 			_ => Err(InvalidTransaction::Call.into()),
 		}
 	}
