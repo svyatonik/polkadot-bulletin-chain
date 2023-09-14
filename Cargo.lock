@@ -787,6 +787,8 @@ dependencies = [
  "bp-runtime",
  "frame-support",
  "frame-system",
+ "parity-scale-codec",
+ "scale-info",
  "sp-api",
  "sp-runtime",
  "sp-std",
