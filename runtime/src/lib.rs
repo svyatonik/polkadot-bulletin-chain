@@ -53,6 +53,7 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 mod bridge_config;
+mod xcm_config;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -446,11 +447,18 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::Sudo(_) => validate_sudo(who).map(|_| ()),
 			Self::Call::Session(pallet_session::Call::<Runtime>::set_keys { .. }) =>
 				ValidatorSet::pre_dispatch_set_keys(who),
-			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. })
-				| Self::Call::BridgePolkadotParachains(BridgeParachainsCall::submit_parachain_heads { .. })
-				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_proof { .. })
-				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_delivery_proof { .. })
-				=> bridge_config::ensure_whitelisted_relayer(who).map(|_| ()),
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof {
+				..
+			}) |
+			Self::Call::BridgePolkadotParachains(
+				BridgeParachainsCall::submit_parachain_heads { .. },
+			) |
+			Self::Call::BridgePolkadotBridgeHubMessages(
+				BridgeMessagesCall::receive_messages_proof { .. },
+			) |
+			Self::Call::BridgePolkadotBridgeHubMessages(
+				BridgeMessagesCall::receive_messages_delivery_proof { .. },
+			) => bridge_config::ensure_whitelisted_relayer(who).map(|_| ()),
 			_ => Err(InvalidTransaction::Call.into()),
 		}
 	}
@@ -471,11 +479,18 @@ impl SignedExtension for ValidateSigned {
 					longevity: SetKeysLongevity::get(),
 					..Default::default()
 				}),
-			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. })
-				| Self::Call::BridgePolkadotParachains(BridgeParachainsCall::submit_parachain_heads { .. })
-				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_proof { .. })
-				| Self::Call::BridgePolkadotBridgeHubMessages(BridgeMessagesCall::receive_messages_delivery_proof { .. })
-				=> bridge_config::ensure_whitelisted_relayer(who),
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof {
+				..
+			}) |
+			Self::Call::BridgePolkadotParachains(
+				BridgeParachainsCall::submit_parachain_heads { .. },
+			) |
+			Self::Call::BridgePolkadotBridgeHubMessages(
+				BridgeMessagesCall::receive_messages_proof { .. },
+			) |
+			Self::Call::BridgePolkadotBridgeHubMessages(
+				BridgeMessagesCall::receive_messages_delivery_proof { .. },
+			) => bridge_config::ensure_whitelisted_relayer(who),
 			_ => Err(InvalidTransaction::Call.into()),
 		}
 	}
