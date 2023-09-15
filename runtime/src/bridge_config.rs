@@ -2,7 +2,7 @@
 
 use crate::{AccountId, Runtime, RuntimeEvent, RuntimeOrigin};
 
-use bp_messages::{target_chain::ForbidInboundMessages, LaneId, MessageNonce};
+use bp_messages::{LaneId, MessageNonce};
 use bp_parachains::SingleParaStoredHeaderDataBuilder;
 use bp_runtime::{ChainId, UnderlyingChainProvider};
 use bridge_runtime_common::{
@@ -15,7 +15,7 @@ use bridge_runtime_common::{
 		BridgedChainWithMessages, MessageBridge, ThisChainWithMessages,
 	},
 	messages_xcm_extension::{
-		SenderAndLane, XcmAsPlainPayload, XcmBlobHauler, XcmBlobHaulerAdapter,
+		SenderAndLane, XcmAsPlainPayload, XcmBlobHauler, XcmBlobHaulerAdapter, XcmBlobMessageDispatch,
 	},
 };
 use frame_support::{parameter_types, RuntimeDebug};
@@ -120,7 +120,11 @@ impl pallet_bridge_messages::Config<WithBridgeHubPolkadotMessagesInstance> for R
 	type DeliveryConfirmationPayments = ();
 
 	type SourceHeaderChain = SourceHeaderChainAdapter<WithBridgeHubPolkadotMessageBridge>;
-	type MessageDispatch = ForbidInboundMessages<(), Self::InboundPayload>; // TODO: no XCM configuration
+	type MessageDispatch = XcmBlobMessageDispatch<
+		FromBridgeHubPolkadotBlobDispatcher,
+		Self::WeightInfo,
+		(),
+	>;
 	type OnMessagesDelivered = ();
 }
 
@@ -160,6 +164,9 @@ impl UnderlyingChainProvider for PolkadotBulletinChain {
 impl ThisChainWithMessages for PolkadotBulletinChain {
 	type RuntimeOrigin = RuntimeOrigin;
 }
+
+/// Dispatches received XCM messages from the Polkadot Bridge Hub.
+pub type FromBridgeHubPolkadotBlobDispatcher = crate::xcm_config::ImmediateXcmDispatcher;
 
 /// Export XCM messages to be relayed to the Polkadot Bridge Hub chain.
 pub type ToBridgeHubPolkadotHaulBlobExporter =

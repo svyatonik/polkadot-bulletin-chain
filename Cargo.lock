@@ -5656,6 +5656,7 @@ dependencies = [
  "sp-consensus-grandpa",
  "sp-core",
  "sp-inherents",
+ "sp-io",
  "sp-offchain",
  "sp-runtime",
  "sp-session",
