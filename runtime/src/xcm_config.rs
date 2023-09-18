@@ -17,8 +17,8 @@
 //! XCM configuration for Polkadot Bulletin chain.
 
 use crate::{
-	bridge_config::ToBridgeHubPolkadotHaulBlobExporter,
-	AllPalletsWithSystem, RuntimeCall, RuntimeOrigin,
+	bridge_config::ToBridgeHubPolkadotHaulBlobExporter, AllPalletsWithSystem, RuntimeCall,
+	RuntimeOrigin,
 };
 
 use bridge_runtime_common::messages_xcm_extension::XcmAsPlainPayload;
@@ -31,7 +31,10 @@ use frame_support::{
 use sp_core::ConstU32;
 use sp_io::hashing::blake2_256;
 use xcm::{latest::prelude::*, DoubleEncoded, VersionedInteriorMultiLocation, VersionedXcm};
-use xcm_builder::{CreateMatcher, DispatchBlob, DispatchBlobError, FixedWeightBounds, MatchXcm, TrailingSetTopicAsId};
+use xcm_builder::{
+	CreateMatcher, DispatchBlob, DispatchBlobError, FixedWeightBounds, MatchXcm,
+	TrailingSetTopicAsId,
+};
 use xcm_executor::{
 	traits::{ConvertOrigin, ShouldExecute, WeightTrader, WithOriginFilter},
 	Assets, XcmExecutor,
@@ -234,10 +237,12 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 			our_universal.global_consensus().map_err(|()| DispatchBlobError::Unbridgable)?;
 		// internally it is the encoded `BridgeMessage`, but it is a private struct, so we
 		// are simply decoding pair here
-		let (universal_dest, message): (VersionedInteriorMultiLocation, VersionedXcm<RuntimeCall>)
-			= Decode::decode( // TODO: decode_all_with_depth_limit?
+		let (universal_dest, message): (VersionedInteriorMultiLocation, VersionedXcm<RuntimeCall>) =
+			Decode::decode(
+				// TODO: decode_all_with_depth_limit?
 				&mut &blob[..],
-			).map_err(|_| DispatchBlobError::InvalidEncoding)?;
+			)
+			.map_err(|_| DispatchBlobError::InvalidEncoding)?;
 		let universal_dest: InteriorMultiLocation = universal_dest
 			.try_into()
 			.map_err(|_| DispatchBlobError::UnsupportedLocationVersion)?;
@@ -266,7 +271,9 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 			message,
 			message_hash,
 			Weight::MAX, // TODO
-		).ensure_complete().map_err(|e| {
+		)
+		.ensure_complete()
+		.map_err(|e| {
 			log::trace!(
 				target: "runtime::xcm",
 				"XCM message from {:?} was dispatched with an error: {:?}",

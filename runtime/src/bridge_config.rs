@@ -15,7 +15,8 @@ use bridge_runtime_common::{
 		BridgedChainWithMessages, MessageBridge, ThisChainWithMessages,
 	},
 	messages_xcm_extension::{
-		SenderAndLane, XcmAsPlainPayload, XcmBlobHauler, XcmBlobHaulerAdapter, XcmBlobMessageDispatch,
+		SenderAndLane, XcmAsPlainPayload, XcmBlobHauler, XcmBlobHaulerAdapter,
+		XcmBlobMessageDispatch,
 	},
 };
 use frame_support::{parameter_types, RuntimeDebug};
@@ -81,7 +82,7 @@ pub type WithBridgeHubPolkadotMessagesInstance = ();
 
 impl pallet_bridge_grandpa::Config<WithPolkadotBridgeGrandpaInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = (); // TODO
+	type WeightInfo = crate::weights::bridge_polkadot_grandpa::WeightInfo<Runtime>;
 
 	type BridgedChain = bp_polkadot::Polkadot;
 	type MaxFreeMandatoryHeadersPerBlock = MaxFreePolkadotHeadersPerBlock;
@@ -90,7 +91,7 @@ impl pallet_bridge_grandpa::Config<WithPolkadotBridgeGrandpaInstance> for Runtim
 
 impl pallet_bridge_parachains::Config<WithPolkadotBridgeParachainsInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = (); // TODO
+	type WeightInfo = crate::weights::bridge_polkadot_parachains::WeightInfo<Runtime>;
 
 	type BridgesGrandpaPalletInstance = WithPolkadotBridgeGrandpaInstance;
 	type ParasPalletName = AtPolkadotParasPalletName;
@@ -102,7 +103,7 @@ impl pallet_bridge_parachains::Config<WithPolkadotBridgeParachainsInstance> for 
 
 impl pallet_bridge_messages::Config<WithBridgeHubPolkadotMessagesInstance> for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = (); // TODO
+	type WeightInfo = crate::weights::bridge_polkadot_messages::WeightInfo<Runtime>;
 
 	type BridgedChainId = BridgeHubPolkadotChainId;
 	type ActiveOutboundLanes = ActiveOutboundLanes;
@@ -122,11 +123,8 @@ impl pallet_bridge_messages::Config<WithBridgeHubPolkadotMessagesInstance> for R
 	type DeliveryConfirmationPayments = ();
 
 	type SourceHeaderChain = SourceHeaderChainAdapter<WithBridgeHubPolkadotMessageBridge>;
-	type MessageDispatch = XcmBlobMessageDispatch<
-		FromBridgeHubPolkadotBlobDispatcher,
-		Self::WeightInfo,
-		(),
-	>;
+	type MessageDispatch =
+		XcmBlobMessageDispatch<FromBridgeHubPolkadotBlobDispatcher, Self::WeightInfo, ()>;
 	type OnMessagesDelivered = ();
 }
 
@@ -193,10 +191,99 @@ pub fn ensure_whitelisted_relayer(who: &AccountId) -> TransactionValidity {
 	Ok(Default::default())
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub mod benchmarking {
+	use super::*;
+
+	/// Proof of messages, coming from BridgeHubPolkadot.
+	pub type FromBridgeHubPolkadotMessagesProof =
+		bridge_runtime_common::messages::target::FromBridgedChainMessagesProof<
+			bp_bridge_hub_polkadot::Hash,
+		>;
+	/// Message delivery proof for `BridgeHubPolkadot` messages.
+	pub type ToBridgeHubPolkadotMessagesDeliveryProof =
+		bridge_runtime_common::messages::source::FromBridgedChainMessagesDeliveryProof<
+			bp_bridge_hub_polkadot::Hash,
+		>;
+
+	use bridge_runtime_common::messages_benchmarking::{
+		generate_xcm_builder_bridge_message_sample, prepare_message_delivery_proof_from_parachain,
+		prepare_message_proof_from_parachain,
+	};
+	use pallet_bridge_messages::benchmarking::{
+		Config as BridgeMessagesConfig, MessageDeliveryProofParams, MessageProofParams,
+	};
+
+	impl BridgeMessagesConfig<WithBridgeHubPolkadotMessagesInstance> for Runtime {
+		fn is_relayer_rewarded(_relayer: &Self::AccountId) -> bool {
+			// no rewards, so we don't care
+			true
+		}
+
+		fn prepare_message_proof(
+			params: MessageProofParams,
+		) -> (FromBridgeHubPolkadotMessagesProof, Weight) {
+			prepare_message_proof_from_parachain::<
+				Runtime,
+				WithPolkadotBridgeGrandpaInstance,
+				WithBridgeHubPolkadotMessageBridge,
+			>(
+				params,
+				generate_xcm_builder_bridge_message_sample(
+					*crate::xcm_config::KawabungaLocation::get().interior(),
+				),
+			)
+		}
+
+		fn prepare_message_delivery_proof(
+			params: MessageDeliveryProofParams<AccountId>,
+		) -> ToBridgeHubPolkadotMessagesDeliveryProof {
+			prepare_message_delivery_proof_from_parachain::<
+				Runtime,
+				WithPolkadotBridgeGrandpaInstance,
+				WithBridgeHubPolkadotMessageBridge,
+			>(params)
+		}
+
+		fn is_message_successfully_dispatched(_nonce: bp_messages::MessageNonce) -> bool {
+			// currently we have no means to detect that
+			true
+		}
+	}
+
+	use bridge_runtime_common::parachains_benchmarking::prepare_parachain_heads_proof;
+	use pallet_bridge_parachains::benchmarking::Config as BridgeParachainsConfig;
+	impl BridgeParachainsConfig<WithPolkadotBridgeParachainsInstance> for Runtime {
+		fn parachains() -> Vec<bp_polkadot_core::parachains::ParaId> {
+			use bp_runtime::Parachain;
+			vec![bp_polkadot_core::parachains::ParaId(
+				bp_bridge_hub_polkadot::BridgeHubPolkadot::PARACHAIN_ID,
+			)]
+		}
+
+		fn prepare_parachain_heads_proof(
+			parachains: &[bp_polkadot_core::parachains::ParaId],
+			parachain_head_size: u32,
+			proof_size: bp_runtime::StorageProofSize,
+		) -> (
+			pallet_bridge_parachains::RelayBlockNumber,
+			pallet_bridge_parachains::RelayBlockHash,
+			bp_polkadot_core::parachains::ParaHeadsProof,
+			Vec<(bp_polkadot_core::parachains::ParaId, bp_polkadot_core::parachains::ParaHash)>,
+		) {
+			prepare_parachain_heads_proof::<Runtime, WithPolkadotBridgeParachainsInstance>(
+				parachains,
+				parachain_head_size,
+				proof_size,
+			)
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
-	use crate::RuntimeCall;
 	use super::*;
+	use crate::RuntimeCall;
 	use codec::Encode;
 
 	#[test]
@@ -236,15 +323,16 @@ mod tests {
 
 	#[test]
 	fn encoded_test_xcm_message_to_bulletin_chain() {
-		let universal_dest: VersionedInteriorMultiLocation
-			= X1(GlobalConsensus(crate::xcm_config::ThisNetwork::get())).into();
-		let xcm: Xcm<RuntimeCall> = vec![
-			Transact {
-				origin_kind: OriginKind::Superuser,
-				call: RuntimeCall::System(frame_system::Call::remark { remark: vec![42] }).encode().into(),
-				require_weight_at_most: Weight::from_parts(20_000_000_000, 8000),
-			}
-		].into();
+		let universal_dest: VersionedInteriorMultiLocation =
+			X1(GlobalConsensus(crate::xcm_config::ThisNetwork::get())).into();
+		let xcm: Xcm<RuntimeCall> = vec![Transact {
+			origin_kind: OriginKind::Superuser,
+			call: RuntimeCall::System(frame_system::Call::remark { remark: vec![42] })
+				.encode()
+				.into(),
+			require_weight_at_most: Weight::from_parts(20_000_000_000, 8000),
+		}]
+		.into();
 		let xcm = VersionedXcm::<RuntimeCall>::V3(xcm);
 		// XCM BridgeMessage - a pair of `VersionedInteriorMultiLocation` and `VersionedXcm<()>`
 		let encoded_xcm_message = (universal_dest, xcm).encode();

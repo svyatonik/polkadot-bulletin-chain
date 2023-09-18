@@ -1,7 +1,7 @@
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use polkadot_bulletin_chain_runtime::{
-	opaque::SessionKeys, AccountId, BabeConfig, BridgePolkadotMessagesConfig,
-	BridgePolkadotGrandpaConfig, BridgePolkadotParachainsConfig, RuntimeGenesisConfig,
+	opaque::SessionKeys, AccountId, BabeConfig, BridgePolkadotGrandpaConfig,
+	BridgePolkadotMessagesConfig, BridgePolkadotParachainsConfig, RuntimeGenesisConfig,
 	SessionConfig, Signature, SudoConfig, SystemConfig, ValidatorSetConfig,
 	BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
 };

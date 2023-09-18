@@ -6,6 +6,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+use bridge_runtime_common::generate_bridge_reject_obsolete_headers_and_messages;
 use frame_system::EnsureRoot;
 use pallet_bridge_grandpa::Call as BridgeGrandpaCall;
 use pallet_bridge_messages::Call as BridgeMessagesCall;
@@ -53,6 +54,7 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 mod bridge_config;
+mod weights;
 mod xcm_config;
 
 /// An index to a block.
@@ -447,13 +449,15 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::Sudo(_) => validate_sudo(who).map(|_| ()),
 			Self::Call::Session(pallet_session::Call::<Runtime>::set_keys { .. }) =>
 				ValidatorSet::pre_dispatch_set_keys(who),
-			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. }) |
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof {
+				..
+			}) |
 			Self::Call::BridgePolkadotParachains(
 				BridgeParachainsCall::submit_parachain_heads { .. },
 			) |
-			Self::Call::BridgePolkadotMessages(
-				BridgeMessagesCall::receive_messages_proof { .. },
-			) |
+			Self::Call::BridgePolkadotMessages(BridgeMessagesCall::receive_messages_proof {
+				..
+			}) |
 			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_delivery_proof { .. },
 			) => bridge_config::ensure_whitelisted_relayer(who).map(|_| ()),
@@ -483,15 +487,27 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::BridgePolkadotParachains(
 				BridgeParachainsCall::submit_parachain_heads { .. },
 			) |
-			Self::Call::BridgePolkadotMessages(
-				BridgeMessagesCall::receive_messages_proof { .. },
-			) |
+			Self::Call::BridgePolkadotMessages(BridgeMessagesCall::receive_messages_proof {
+				..
+			}) |
 			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_delivery_proof { .. },
 			) => bridge_config::ensure_whitelisted_relayer(who),
 			_ => Err(InvalidTransaction::Call.into()),
 		}
 	}
+}
+
+// it'll generate signed extensions to invalidate obsolete bridge transactions before
+// they'll be included into block
+generate_bridge_reject_obsolete_headers_and_messages! {
+	RuntimeCall, AccountId,
+	// Grandpa
+	BridgePolkadotGrandpa,
+	// Parachains
+	BridgePolkadotParachains,
+	// Messages
+	BridgePolkadotMessages
 }
 
 /// The SignedExtension to the basic transaction logic.
@@ -504,6 +520,7 @@ pub type SignedExtra = (
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	ValidateSigned,
+	BridgeRejectObsoleteHeadersAndMessages,
 );
 
 /// Unchecked extrinsic type as expected by this runtime.
@@ -533,6 +550,9 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_transaction_storage, TransactionStorage]
 		[pallet_validator_set, ValidatorSet]
+		[pallet_bridge_grandpa, BridgePolkadotGrandpa]
+		[pallet_bridge_parachains, BridgeParachainsBench::<Runtime, bridge_config::WithPolkadotBridgeParachainsInstance>]
+		[pallet_bridge_messages, BridgeMessagesBench::<Runtime, bridge_config::WithBridgeHubPolkadotMessagesInstance>]
 	);
 }
 
@@ -754,6 +774,9 @@ impl_runtime_apis! {
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
 
+			use pallet_bridge_parachains::benchmarking::Pallet as BridgeParachainsBench;
+			use pallet_bridge_messages::benchmarking::Pallet as BridgeMessagesBench;
+
 			let mut list = Vec::<BenchmarkList>::new();
 			list_benchmarks!(list, extra);
 
@@ -769,6 +792,9 @@ impl_runtime_apis! {
 
 			use frame_system_benchmarking::Pallet as SystemBench;
 			use baseline::Pallet as BaselineBench;
+
+			use pallet_bridge_parachains::benchmarking::Pallet as BridgeParachainsBench;
+			use pallet_bridge_messages::benchmarking::Pallet as BridgeMessagesBench;
 
 			impl frame_system_benchmarking::Config for Runtime {}
 			impl baseline::Config for Runtime {}
