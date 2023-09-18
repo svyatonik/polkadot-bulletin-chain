@@ -18,14 +18,14 @@
 
 use crate::{
 	bridge_config::ToBridgeHubPolkadotHaulBlobExporter,
-	AllPalletsWithSystem, BridgePolkadotBridgeHubMessages, RuntimeCall, RuntimeOrigin,
+	AllPalletsWithSystem, RuntimeCall, RuntimeOrigin,
 };
 
 use bridge_runtime_common::messages_xcm_extension::XcmAsPlainPayload;
 use codec::{Decode, Encode};
 use frame_support::{
 	ensure, match_types, parameter_types,
-	traits::{Contains, Nothing, PalletInfoAccess, ProcessMessageError},
+	traits::{Contains, Nothing, ProcessMessageError},
 	weights::Weight,
 };
 use sp_core::ConstU32;
@@ -148,7 +148,7 @@ impl<
 			.matcher()
 			.assert_remaining_insts(1)?
 			.match_next_inst(|inst| match inst {
-				Transact { origin_kind: OriginKind::Xcm, call: encoded_call, .. } => {
+				Transact { origin_kind: OriginKind::Superuser, call: encoded_call, .. } => {
 					// this is a hack - don't know if there's a way to do that properly
 					// or else we can simply allow all calls
 					let mut decoded_call = DoubleEncoded::<RuntimeCall>::from(encoded_call.clone());
@@ -218,7 +218,7 @@ impl xcm_executor::Config for XcmConfig {
 	type Aliasers = Nothing;
 }
 
-// TODO: below shall be either static (behcmarked) weight, or simply insert message to
+// TODO: below shall be either static (benchmarked) weight, or simply insert message to
 // the queue for later dispatch. This version is for tests only
 
 /// XCM blob dispatcher that executes XCM message at this chain.
@@ -235,7 +235,9 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 		// internally it is the encoded `BridgeMessage`, but it is a private struct, so we
 		// are simply decoding pair here
 		let (universal_dest, message): (VersionedInteriorMultiLocation, VersionedXcm<RuntimeCall>)
-			= Decode::decode(&mut &blob[..]).map_err(|_| DispatchBlobError::InvalidEncoding)?;
+			= Decode::decode( // TODO: decode_all_with_depth_limit?
+				&mut &blob[..],
+			).map_err(|_| DispatchBlobError::InvalidEncoding)?;
 		let universal_dest: InteriorMultiLocation = universal_dest
 			.try_into()
 			.map_err(|_| DispatchBlobError::UnsupportedLocationVersion)?;
@@ -245,17 +247,17 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 			.global_consensus()
 			.map_err(|()| DispatchBlobError::NonUniversalDestination)?;
 		ensure!(intended_global == our_global, DispatchBlobError::WrongGlobal);
-		let mut message: Xcm<RuntimeCall> =
+		let message: Xcm<RuntimeCall> =
 			message.try_into().map_err(|_| DispatchBlobError::UnsupportedXcmVersion)?;
 
-		// Prepend our bridge instance discriminator.
-		// Can be used for fine-grained control of origin on destination in case of multiple bridge
-		// instances, e.g. restrict `type UniversalAliases` and `UniversalOrigin` instruction to
-		// trust just particular bridge instance for `NetworkId`.
-		let our_messages_pallet_location = X1(PalletInstance(
-			<BridgePolkadotBridgeHubMessages as PalletInfoAccess>::index() as u8,
-		));
-		message.0.insert(0, DescendOrigin(our_messages_pallet_location));
+		// TODO: insert pallet discriminator?
+
+		log::trace!(
+			target: "runtime::xcm",
+			"Going to dispatch XCM message from {:?}: {:?}",
+			KawabungaLocation::get(),
+			message,
+		);
 
 		// execute the XCM program
 		let message_hash = message.using_encoded(blake2_256);
@@ -264,7 +266,16 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 			message,
 			message_hash,
 			Weight::MAX, // TODO
-		).ensure_complete().map_err(|_| DispatchBlobError::RoutingError)?; // TODO: this is bad
+		).ensure_complete().map_err(|e| {
+			log::trace!(
+				target: "runtime::xcm",
+				"XCM message from {:?} was dispatched with an error: {:?}",
+				KawabungaLocation::get(),
+				e,
+			);
+
+			DispatchBlobError::RoutingError
+		})?; // TODO: this is bad
 
 		Ok(())
 	}

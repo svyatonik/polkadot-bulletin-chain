@@ -13,7 +13,7 @@ default_command = "./bin/polkadot-bulletin-chain"
 	name = "alice"
 	ws_port = 9942
 	validator = true
-	args = [ "--ipfs-server", "-lbitswap=trace" ]
+	args = [ "--ipfs-server", "-lbitswap=trace", "-lruntime=trace", "-lxcm=trace" ]
 
 	[[relaychain.nodes]]
 	name = "bob"

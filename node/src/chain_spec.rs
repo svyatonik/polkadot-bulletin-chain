@@ -1,6 +1,6 @@
 use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use polkadot_bulletin_chain_runtime::{
-	opaque::SessionKeys, AccountId, BabeConfig, BridgePolkadotBridgeHubMessagesConfig,
+	opaque::SessionKeys, AccountId, BabeConfig, BridgePolkadotMessagesConfig,
 	BridgePolkadotGrandpaConfig, BridgePolkadotParachainsConfig, RuntimeGenesisConfig,
 	SessionConfig, Signature, SudoConfig, SystemConfig, ValidatorSetConfig,
 	BABE_GENESIS_EPOCH_CONFIG, WASM_BINARY,
@@ -160,7 +160,7 @@ fn testnet_genesis(
 			owner: Some(root_key.clone()),
 			..Default::default()
 		},
-		bridge_polkadot_bridge_hub_messages: BridgePolkadotBridgeHubMessagesConfig {
+		bridge_polkadot_messages: BridgePolkadotMessagesConfig {
 			owner: Some(root_key),
 			..Default::default()
 		},

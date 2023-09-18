@@ -385,7 +385,7 @@ construct_runtime!(
 		// Bridge pallets
 		BridgePolkadotGrandpa: pallet_bridge_grandpa,
 		BridgePolkadotParachains: pallet_bridge_parachains,
-		BridgePolkadotBridgeHubMessages: pallet_bridge_messages,
+		BridgePolkadotMessages: pallet_bridge_messages,
 	}
 );
 
@@ -447,16 +447,14 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::Sudo(_) => validate_sudo(who).map(|_| ()),
 			Self::Call::Session(pallet_session::Call::<Runtime>::set_keys { .. }) =>
 				ValidatorSet::pre_dispatch_set_keys(who),
-			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof {
-				..
-			}) |
+			Self::Call::BridgePolkadotGrandpa(BridgeGrandpaCall::submit_finality_proof { .. }) |
 			Self::Call::BridgePolkadotParachains(
 				BridgeParachainsCall::submit_parachain_heads { .. },
 			) |
-			Self::Call::BridgePolkadotBridgeHubMessages(
+			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_proof { .. },
 			) |
-			Self::Call::BridgePolkadotBridgeHubMessages(
+			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_delivery_proof { .. },
 			) => bridge_config::ensure_whitelisted_relayer(who).map(|_| ()),
 			_ => Err(InvalidTransaction::Call.into()),
@@ -485,10 +483,10 @@ impl SignedExtension for ValidateSigned {
 			Self::Call::BridgePolkadotParachains(
 				BridgeParachainsCall::submit_parachain_heads { .. },
 			) |
-			Self::Call::BridgePolkadotBridgeHubMessages(
+			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_proof { .. },
 			) |
-			Self::Call::BridgePolkadotBridgeHubMessages(
+			Self::Call::BridgePolkadotMessages(
 				BridgeMessagesCall::receive_messages_delivery_proof { .. },
 			) => bridge_config::ensure_whitelisted_relayer(who),
 			_ => Err(InvalidTransaction::Call.into()),
@@ -717,6 +715,31 @@ impl_runtime_apis! {
 			BridgePolkadotParachains::best_parachain_head_id::<
 				bp_bridge_hub_polkadot::BridgeHubPolkadot
 			>().unwrap_or(None)
+		}
+	}
+
+	impl bp_bridge_hub_polkadot::FromBridgeHubPolkadotInboundLaneApi<Block> for Runtime {
+		fn message_details(
+			lane: bp_messages::LaneId,
+			messages: Vec<(bp_messages::MessagePayload, bp_messages::OutboundMessageDetails)>,
+		) -> Vec<bp_messages::InboundMessageDetails> {
+			bridge_runtime_common::messages_api::inbound_message_details::<
+				Runtime,
+				bridge_config::WithBridgeHubPolkadotMessagesInstance,
+			>(lane, messages)
+		}
+	}
+
+	impl bp_bridge_hub_polkadot::ToBridgeHubPolkadotOutboundLaneApi<Block> for Runtime {
+		fn message_details(
+			lane: bp_messages::LaneId,
+			begin: bp_messages::MessageNonce,
+			end: bp_messages::MessageNonce,
+		) -> Vec<bp_messages::OutboundMessageDetails> {
+			bridge_runtime_common::messages_api::outbound_message_details::<
+				Runtime,
+				bridge_config::WithBridgeHubPolkadotMessagesInstance,
+			>(lane, begin, end)
 		}
 	}
 

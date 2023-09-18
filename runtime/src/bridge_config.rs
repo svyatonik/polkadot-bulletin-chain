@@ -21,7 +21,7 @@ use bridge_runtime_common::{
 use frame_support::{parameter_types, RuntimeDebug};
 use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidity};
 use sp_std::vec::Vec;
-use xcm::latest::prelude::*;
+use xcm::prelude::*;
 use xcm_builder::HaulBlobExporter;
 
 /// Lane that we are using to send and receive messages.
@@ -32,7 +32,9 @@ parameter_types! {
 	/// and physically deliver messages on this chain.
 	///
 	/// It can be changed by the governance later.
-	pub storage WhitelistedRelayers: Vec<AccountId> = Vec::new();
+	pub storage WhitelistedRelayers: Vec<AccountId> = {
+		crate::Sudo::key().map(|sudo_key| sp_std::vec![sudo_key]).unwrap_or_default()
+	};
 
 	/// A number of Polkadot mandatory headers that are accepted for free at every
 	/// **this chain** block.
@@ -193,6 +195,10 @@ pub fn ensure_whitelisted_relayer(who: &AccountId) -> TransactionValidity {
 
 #[cfg(test)]
 mod tests {
+	use crate::RuntimeCall;
+	use super::*;
+	use codec::Encode;
+
 	#[test]
 	fn may_change_whitelisted_relayers_set_using_sudo() {
 		// TODO
@@ -226,5 +232,22 @@ mod tests {
 	#[test]
 	fn regular_account_can_not_submit_messages_and_confirmations_from_polkadot_bridge_hub() {
 		// TODO
+	}
+
+	#[test]
+	fn encoded_test_xcm_message_to_bulletin_chain() {
+		let universal_dest: VersionedInteriorMultiLocation
+			= X1(GlobalConsensus(crate::xcm_config::ThisNetwork::get())).into();
+		let xcm: Xcm<RuntimeCall> = vec![
+			Transact {
+				origin_kind: OriginKind::Superuser,
+				call: RuntimeCall::System(frame_system::Call::remark { remark: vec![42] }).encode().into(),
+				require_weight_at_most: Weight::from_parts(20_000_000_000, 8000),
+			}
+		].into();
+		let xcm = VersionedXcm::<RuntimeCall>::V3(xcm);
+		// XCM BridgeMessage - a pair of `VersionedInteriorMultiLocation` and `VersionedXcm<()>`
+		let encoded_xcm_message = (universal_dest, xcm).encode();
+		println!("{}", hex::encode(&encoded_xcm_message));
 	}
 }
