@@ -179,7 +179,7 @@ impl<
 type LocalOriginConverter = (
 	// Currently we only accept XCM messages from Kawabunga and the origin for such messages
 	// is local root.
-	KawabungaParachainAsRoot, // TODO
+	KawabungaParachainAsRoot,
 );
 
 /// No other chains in local consensus.
@@ -287,3 +287,9 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 		Ok(())
 	}
 }
+/*
+#[cfg(test)]
+mod tests {
+	use super::
+}
+*/

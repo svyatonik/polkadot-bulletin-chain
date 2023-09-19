@@ -78,10 +78,12 @@ substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/pari
 
 [dev-dependencies]
 bp-test-utils = { path = "../bridges/primitives/test-utils" }
+bridge-runtime-common = { path = "../bridges/bin/runtime-common", features = ["integrity-test"] }
 env_logger = "0.10"
 hex = "0.4"
 sp-keyring = { version = "24.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
 sp-trie = { version = "22.0.0", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v1.0.0" }
+static_assertions = "1.1"
 
 [features]
 default = ["std"]
