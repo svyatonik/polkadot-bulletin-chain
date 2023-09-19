@@ -33,7 +33,7 @@ use sp_io::hashing::blake2_256;
 use xcm::{latest::prelude::*, DoubleEncoded, VersionedInteriorMultiLocation, VersionedXcm};
 use xcm_builder::{
 	CreateMatcher, DispatchBlob, DispatchBlobError, FixedWeightBounds, MatchXcm,
-	TrailingSetTopicAsId,
+	TrailingSetTopicAsId, UnpaidLocalExporter,
 };
 use xcm_executor::{
 	traits::{ConvertOrigin, ShouldExecute, WeightTrader, WithOriginFilter},
@@ -182,8 +182,8 @@ type LocalOriginConverter = (
 	KawabungaParachainAsRoot,
 );
 
-/// No other chains in local consensus.
-pub type XcmRouter = ();
+/// Only bridged destination is supported.
+pub type XcmRouter = UnpaidLocalExporter<ToBridgeHubPolkadotHaulBlobExporter, UniversalLocation>;
 
 /// The barriers one of which must be passed for an XCM message to be executed.
 pub type Barrier = TrailingSetTopicAsId<
@@ -287,9 +287,86 @@ impl DispatchBlob for ImmediateXcmDispatcher {
 		Ok(())
 	}
 }
-/*
+
 #[cfg(test)]
 mod tests {
-	use super::
+	use super::*;
+	use crate::{
+		bridge_config::{tests::run_test, WithBridgeHubPolkadotMessagesInstance, XCM_LANE},
+		BridgePolkadotMessages, Runtime,
+	};
+	use bp_messages::{
+		target_chain::{DispatchMessage, DispatchMessageData, MessageDispatch},
+		MessageKey,
+	};
+	use pallet_bridge_messages::Config as MessagesConfig;
+
+	type Dispatcher =
+		<Runtime as MessagesConfig<WithBridgeHubPolkadotMessagesInstance>>::MessageDispatch;
+
+	fn test_storage_key() -> Vec<u8> {
+		(*b"test_key").to_vec()
+	}
+
+	fn test_storage_value() -> Vec<u8> {
+		(*b"test_value").to_vec()
+	}
+
+	fn encoded_xcm_message_from_bridge_hub_polkadot() -> Vec<u8> {
+		let universal_dest: VersionedInteriorMultiLocation =
+			X1(GlobalConsensus(crate::xcm_config::ThisNetwork::get())).into();
+		let xcm: Xcm<RuntimeCall> = vec![Transact {
+			origin_kind: OriginKind::Superuser,
+			call: RuntimeCall::System(frame_system::Call::set_storage {
+				items: vec![(test_storage_key(), test_storage_value())],
+			})
+			.encode()
+			.into(),
+			require_weight_at_most: Weight::from_parts(20_000_000_000, 8000),
+		}]
+		.into();
+		let xcm = VersionedXcm::<RuntimeCall>::V3(xcm);
+		// XCM BridgeMessage - a pair of `VersionedInteriorMultiLocation` and `VersionedXcm<()>`
+		(universal_dest, xcm).encode()
+	}
+
+	#[test]
+	fn messages_from_bridge_hub_polkadot_are_dispatched() {
+		run_test(|| {
+			assert_eq!(frame_support::storage::unhashed::get_raw(&test_storage_key()), None);
+			Dispatcher::dispatch(DispatchMessage {
+				key: MessageKey { lane_id: XCM_LANE, nonce: 1 },
+				data: DispatchMessageData {
+					payload: Ok(encoded_xcm_message_from_bridge_hub_polkadot()),
+				},
+			});
+			assert_eq!(
+				frame_support::storage::unhashed::get_raw(&test_storage_key()),
+				Some(test_storage_value()),
+			);
+		});
+	}
+
+	#[test]
+	fn messages_to_bridge_hub_polkadot_are_sent() {
+		run_test(|| {
+			assert_eq!(
+				BridgePolkadotMessages::outbound_lane_data(XCM_LANE).latest_generated_nonce,
+				0
+			);
+			send_xcm::<XcmRouter>(KawabungaLocation::get(), vec![ClearOrigin].into())
+				.expect("message is sent");
+			assert_ne!(
+				BridgePolkadotMessages::outbound_lane_data(XCM_LANE).latest_generated_nonce,
+				0
+			);
+		})
+	}
+
+	#[test]
+	fn encoded_test_xcm_message_to_bulletin_chain() {
+		// this "test" is currently used to encode dummy message for Polkadot BH -> Bulletin
+		// bridge. Once we have real sending chain (Kawabunga), it could be removed
+		println!("{}", hex::encode(&encoded_xcm_message_from_bridge_hub_polkadot()));
+	}
 }
-*/

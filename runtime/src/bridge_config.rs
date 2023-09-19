@@ -285,7 +285,7 @@ pub mod benchmarking {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
 	use super::*;
 	use crate::{
 		BridgePolkadotGrandpa, BridgePolkadotMessages, BridgeRejectObsoleteHeadersAndMessages,
@@ -493,7 +493,7 @@ mod tests {
 		assert_ok!(apply_result.unwrap());
 	}
 
-	fn run_test<T>(test: impl FnOnce() -> T) -> T {
+	pub fn run_test<T>(test: impl FnOnce() -> T) -> T {
 		let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 		pallet_sudo::GenesisConfig::<Runtime> { key: Some(sudo_signer().into()) }
 			.assimilate_storage(&mut t)
@@ -888,25 +888,5 @@ mod tests {
 					bp_bridge_hub_polkadot::WITH_BRIDGE_HUB_POLKADOT_MESSAGES_PALLET_NAME,
 			},
 		});
-	}
-
-	#[test]
-	fn encoded_test_xcm_message_to_bulletin_chain() {
-		// this "test" is currently used to encode dummy message for Polkadot BH -> Bulletin
-		// bridge. Once we have real sending chain (Kawabunga), it could be removed
-		let universal_dest: VersionedInteriorMultiLocation =
-			X1(GlobalConsensus(crate::xcm_config::ThisNetwork::get())).into();
-		let xcm: Xcm<RuntimeCall> = vec![Transact {
-			origin_kind: OriginKind::Superuser,
-			call: RuntimeCall::System(frame_system::Call::remark { remark: vec![42] })
-				.encode()
-				.into(),
-			require_weight_at_most: Weight::from_parts(20_000_000_000, 8000),
-		}]
-		.into();
-		let xcm = VersionedXcm::<RuntimeCall>::V3(xcm);
-		// XCM BridgeMessage - a pair of `VersionedInteriorMultiLocation` and `VersionedXcm<()>`
-		let encoded_xcm_message = (universal_dest, xcm).encode();
-		println!("{}", hex::encode(&encoded_xcm_message));
 	}
 }
