@@ -17,38 +17,41 @@
 //! XCM configuration for Polkadot Bulletin chain.
 
 use crate::{
-	bridge_config::ToBridgeHubPolkadotHaulBlobExporter, AllPalletsWithSystem, RuntimeCall,
-	RuntimeOrigin,
+	bridge_config::ToBridgeHubPolkadotHaulBlobExporter,
+	AllPalletsWithSystem, RuntimeCall, RuntimeOrigin,
 };
 
 use bridge_runtime_common::messages_xcm_extension::XcmAsPlainPayload;
 use codec::{Decode, Encode};
 use frame_support::{
 	ensure, match_types, parameter_types,
-	traits::{Contains, Nothing, ProcessMessageError},
+	traits::{Contains, Everything, Nothing, ProcessMessageError},
 	weights::Weight,
 };
-use sp_core::ConstU32;
 use sp_io::hashing::blake2_256;
-use xcm::{latest::prelude::*, DoubleEncoded, VersionedInteriorMultiLocation, VersionedXcm};
+use sp_core::ConstU32;
+use xcm::{latest::prelude::*, VersionedInteriorMultiLocation, VersionedXcm};
 use xcm_builder::{
-	CreateMatcher, DispatchBlob, DispatchBlobError, FixedWeightBounds, MatchXcm,
-	TrailingSetTopicAsId, UnpaidLocalExporter,
+	CreateMatcher, DispatchBlob, DispatchBlobError, FixedWeightBounds, MatchXcm, TrailingSetTopicAsId, UnpaidLocalExporter, WithComputedOrigin,
 };
 use xcm_executor::{
 	traits::{ConvertOrigin, ShouldExecute, WeightTrader, WithOriginFilter},
 	Assets, XcmExecutor,
 };
 
+// TODO [bridge]: change to actual value here + everywhere where Kawabunga is mentioned
+/// Id of the Polkadot parachain that we are going to bridge with.
 const KAWABUNGA_PARACHAIN_ID: u32 = 42;
 
 parameter_types! {
+	// TODO [bridge]: how we are supposed to set it? Named? ByGenesis - if so, when? After generating
+	// chain spec?
 	/// The Polkadot Bulletin Chain network ID.
-	pub const ThisNetwork: NetworkId = NetworkId::ByGenesis([42u8; 32]); // TODO
+	pub const ThisNetwork: NetworkId = NetworkId::ByGenesis([42u8; 32]);
 	/// Our location in the universe of consensus systems.
 	pub const UniversalLocation: InteriorMultiLocation = X1(GlobalConsensus(ThisNetwork::get()));
 
-	/// Location of the Kawabunga chain, relative to this runtime.
+	/// Location of the Kawabunga parachain, relative to this runtime.
 	pub KawabungaLocation: MultiLocation = MultiLocation::new(1, X2(
 		GlobalConsensus(Polkadot),
 		Parachain(KAWABUNGA_PARACHAIN_ID),
@@ -64,12 +67,18 @@ parameter_types! {
 match_types! {
 	// Only contains Kawabunga parachain location.
 	pub type OnlyKawabungaLocation: impl Contains<MultiLocation> = {
-		MultiLocation { parents: 1, interior: X2(GlobalConsensus(Polkadot), Parachain(KAWABUNGA_PARACHAIN_ID)) }
+		MultiLocation { parents: 1, interior: X2(
+			GlobalConsensus(Polkadot),
+			Parachain(KAWABUNGA_PARACHAIN_ID),
+		) }
 	};
 
-	// Only passes calls that may be called using XCM transact through the bridge.
-	pub type AllowedXcmTransactCalls: impl Contains<RuntimeCall> = {
-		_ // TODO
+	// Supported universal aliases.
+	pub type UniversalAliases: impl Contains<(MultiLocation, Junction)> = {
+		(
+			MultiLocation { parents: 0, interior: Here },
+			GlobalConsensus(Polkadot),
+		)
 	};
 }
 
@@ -92,10 +101,9 @@ impl ConvertOrigin<RuntimeOrigin> for KawabungaParachainAsRoot {
 				OriginKind::Superuser,
 				MultiLocation {
 					parents: 1,
-					interior: X2(GlobalConsensus(remote_network), Parachain(remote_parachain)),
+					interior: X2(GlobalConsensus(Polkadot), Parachain(KAWABUNGA_PARACHAIN_ID)),
 				},
-			) if remote_network == Polkadot && remote_parachain == KAWABUNGA_PARACHAIN_ID =>
-				Ok(RuntimeOrigin::root()),
+			) => Ok(RuntimeOrigin::root()),
 			(_, origin) => Err(origin),
 		}
 	}
@@ -119,17 +127,15 @@ impl WeightTrader for NoopTrader {
 }
 
 /// Allows execution from `origin` if it is contained in `AllowedOrigin`
-/// and if it is just a straight `Transact` which contains `AllowedCall`.
+/// and if it is just a straight `Transact` which contains any call.
 ///
-/// That's a 1:1 copy of corresponding Cumulus structire.
-pub struct AllowUnpaidTransactsFrom<RuntimeCall, AllowedCall, AllowedOrigin>(
-	sp_std::marker::PhantomData<(RuntimeCall, AllowedCall, AllowedOrigin)>,
+/// That's a 1:1 copy of corresponding Cumulus structure.
+pub struct AllowUnpaidTransactsFrom<RuntimeCall, AllowedOrigin>(
+	sp_std::marker::PhantomData<(RuntimeCall, AllowedOrigin)>,
 );
-impl<
-		RuntimeCall: Decode,
-		AllowedCall: Contains<RuntimeCall>,
-		AllowedOrigin: Contains<MultiLocation>,
-	> ShouldExecute for AllowUnpaidTransactsFrom<RuntimeCall, AllowedCall, AllowedOrigin>
+
+impl<RuntimeCall: Decode, AllowedOrigin: Contains<MultiLocation>> ShouldExecute
+	for AllowUnpaidTransactsFrom<RuntimeCall, AllowedOrigin>
 {
 	fn should_execute<Call>(
 		origin: &MultiLocation,
@@ -139,7 +145,7 @@ impl<
 	) -> Result<(), ProcessMessageError> {
 		log::trace!(
 			target: "xcm::barriers",
-			"AllowUnpaidTransactFrom origin: {:?}, instructions: {:?}, max_weight: {:?}, properties: {:?}",
+			"AllowUnpaidTransactsFrom origin: {:?}, instructions: {:?}, max_weight: {:?}, properties: {:?}",
 			origin, instructions, max_weight, _properties,
 		);
 
@@ -151,19 +157,8 @@ impl<
 			.matcher()
 			.assert_remaining_insts(1)?
 			.match_next_inst(|inst| match inst {
-				Transact { origin_kind: OriginKind::Superuser, call: encoded_call, .. } => {
-					// this is a hack - don't know if there's a way to do that properly
-					// or else we can simply allow all calls
-					let mut decoded_call = DoubleEncoded::<RuntimeCall>::from(encoded_call.clone());
-					ensure!(
-						AllowedCall::contains(
-							decoded_call
-								.ensure_decoded()
-								.map_err(|_| ProcessMessageError::BadFormat)?
-						),
-						ProcessMessageError::BadFormat,
-					);
-
+				Transact { origin_kind: OriginKind::Superuser, .. } => {
+					// we allow all calls through the bridge
 					Ok(())
 				},
 				_ => Err(ProcessMessageError::BadFormat),
@@ -187,8 +182,12 @@ pub type XcmRouter = UnpaidLocalExporter<ToBridgeHubPolkadotHaulBlobExporter, Un
 
 /// The barriers one of which must be passed for an XCM message to be executed.
 pub type Barrier = TrailingSetTopicAsId<
-	// We only allow unpaid execution from the Kawabunga parachain.
-	AllowUnpaidTransactsFrom<RuntimeCall, AllowedXcmTransactCalls, OnlyKawabungaLocation>,
+	WithComputedOrigin<
+		// We only allow unpaid execution from the Kawabunga parachain.
+		AllowUnpaidTransactsFrom<RuntimeCall, OnlyKawabungaLocation>,
+		UniversalLocation,
+		ConstU32<2>,
+	>,
 >;
 
 /// XCM executor configuration.
@@ -203,7 +202,9 @@ impl xcm_executor::Config for XcmConfig {
 	type IsTeleporter = ();
 	type UniversalLocation = UniversalLocation;
 	type Barrier = Barrier;
-	type Weigher = FixedWeightBounds<BaseXcmWeight, RuntimeCall, MaxInstructions>; // TODO
+	// TODO [bridge]: is it ok to use `FixedWeightBounds` here? We don't have the `pallet-xcm`
+	// and IIUC can't use XCM benchmarks because of that?
+	type Weigher = FixedWeightBounds<BaseXcmWeight, RuntimeCall, MaxInstructions>;
 	type Trader = NoopTrader;
 	type ResponseHandler = ();
 	type AssetTrap = ();
@@ -215,9 +216,9 @@ impl xcm_executor::Config for XcmConfig {
 	type MaxAssetsIntoHolding = ConstU32<0>;
 	type FeeManager = ();
 	type MessageExporter = ToBridgeHubPolkadotHaulBlobExporter;
-	type UniversalAliases = Nothing;
-	type CallDispatcher = WithOriginFilter<AllowedXcmTransactCalls>;
-	type SafeCallFilter = AllowedXcmTransactCalls;
+	type UniversalAliases = UniversalAliases;
+	type CallDispatcher = WithOriginFilter<Everything>;
+	type SafeCallFilter = Everything;
 	type Aliasers = Nothing;
 }
 
@@ -300,6 +301,7 @@ mod tests {
 		MessageKey,
 	};
 	use pallet_bridge_messages::Config as MessagesConfig;
+	use xcm_executor::traits::Properties;
 
 	type Dispatcher =
 		<Runtime as MessagesConfig<WithBridgeHubPolkadotMessagesInstance>>::MessageDispatch;
@@ -368,5 +370,39 @@ mod tests {
 		// this "test" is currently used to encode dummy message for Polkadot BH -> Bulletin
 		// bridge. Once we have real sending chain (Kawabunga), it could be removed
 		println!("{}", hex::encode(&encoded_xcm_message_from_bridge_hub_polkadot()));
+	}
+
+	#[test]
+	fn expected_message_from_kawabunga_passes_barrier() {
+		// prepare message that we expect to come from the Polkadot BH
+		// (everything is relative to Polkadot BH)
+		let bridge_hub_universal_location = X2(GlobalConsensus(Polkadot), Parachain(1002));
+		let kawabunga_origin = MultiLocation::new(1, Parachain(KAWABUNGA_PARACHAIN_ID));
+		let universal_source =
+			bridge_hub_universal_location.within_global(kawabunga_origin).unwrap();
+		let (local_net, local_sub) = universal_source.split_global().unwrap();
+		let mut xcm: Xcm<RuntimeCall> = vec![
+			UniversalOrigin(GlobalConsensus(local_net)),
+			DescendOrigin(local_sub),
+			Transact {
+				origin_kind: OriginKind::Superuser,
+				require_weight_at_most: Weight::MAX,
+				call: RuntimeCall::System(frame_system::Call::remark { remark: vec![42] })
+					.encode()
+					.into(),
+			},
+		]
+		.into();
+
+		// ensure that it passes local XCM Barrier
+		assert_eq!(
+			Barrier::should_execute(
+				&Here.into(),
+				xcm.inner_mut(),
+				Weight::MAX,
+				&mut Properties { weight_credit: Weight::MAX, message_id: None },
+			),
+			Ok(())
+		);
 	}
 }
