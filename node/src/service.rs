@@ -214,7 +214,7 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 	let enable_grandpa = !config.disable_grandpa;
 	let prometheus_registry = config.prometheus_registry().cloned();
 
-	let shared_voter_state = sc_consensus_grandpa::SharedVoterState::empty();
+	let shared_voter_state = SharedVoterState::empty();
 
 	let rpc_extensions_builder = {
 		let client = client.clone();
@@ -233,12 +233,14 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
 			let deps = crate::rpc::FullDeps {
 				client: client.clone(),
 				pool: pool.clone(),
-				subscription_executor,
-				shared_authority_set: shared_authority_set.clone(),
-				shared_voter_state: shared_voter_state.clone(),
-				justification_stream: justification_stream.clone(),
-				finality_proof_provider: finality_proof_provider.clone(),
 				deny_unsafe,
+				grandpa: crate::rpc::GrandpaDeps {
+					subscription_executor,
+					shared_authority_set: shared_authority_set.clone(),
+					shared_voter_state: shared_voter_state.clone(),
+					justification_stream: justification_stream.clone(),
+					finality_proof_provider: finality_proof_provider.clone(),
+				},
 			};
 			crate::rpc::create_full(deps).map_err(Into::into)
 		})
