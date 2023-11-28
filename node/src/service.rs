@@ -4,6 +4,7 @@ use futures::FutureExt;
 use polkadot_bulletin_chain_runtime as runtime;
 use runtime::{opaque::Block, RuntimeApi};
 use sc_client_api::{Backend, BlockBackend};
+use sc_consensus_grandpa::SharedVoterState;
 pub use sc_executor::NativeElseWasmExecutor;
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager, WarpSyncParams};
 use sc_telemetry::{Telemetry, TelemetryWorker};
