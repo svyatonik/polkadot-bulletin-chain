@@ -56,6 +56,7 @@ pallet-validator-set = { version = "1.0.0", default-features = false, path = "..
 
 # Bridge dependencies
 bp-bridge-hub-polkadot = { version = "0.1.0", default-features = false, path = "../bridges/primitives/chain-bridge-hub-polkadot" }
+bp-bridge-hub-rococo = { version = "0.1.0", default-features = false, path = "../bridges/primitives/chain-bridge-hub-rococo" }
 bp-header-chain = { version = "0.1.0", default-features = false, path = "../bridges/primitives/header-chain" }
 bp-messages = { version = "0.1.0", default-features = false, path = "../bridges/primitives/messages" }
 bp-parachains = { version = "0.1.0", default-features = false, path = "../bridges/primitives/parachains" }
@@ -128,6 +129,7 @@ std = [
 	"pallet-validator-set/std",
 
 	"bp-bridge-hub-polkadot/std",
+	"bp-bridge-hub-rococo/std",
 	"bp-header-chain/std",
 	"bp-messages/std",
 	"bp-parachains/std",
@@ -192,3 +194,4 @@ try-runtime = [
 	"pallet-transaction-storage/try-runtime",
 	"pallet-validator-set/try-runtime",
 ]
+rococo = []

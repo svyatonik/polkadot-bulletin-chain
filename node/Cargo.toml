@@ -79,3 +79,5 @@ runtime-benchmarks = [
 # Enable features that allow the runtime to be tried and debugged. Name might be subject to change
 # in the near future.
 try-runtime = ["polkadot-bulletin-chain-runtime/try-runtime", "try-runtime-cli/try-runtime"]
+# To bridge with Rococo Bridge Hub instead of Polkadot Bridge Hub
+rococo = ["polkadot-bulletin-chain-runtime/rococo"]

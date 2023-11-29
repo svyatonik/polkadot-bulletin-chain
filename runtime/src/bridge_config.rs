@@ -52,8 +52,6 @@ parameter_types! {
 	/// A name of parachains pallet at Pokadot.
 	pub const AtPolkadotParasPalletName: &'static str = bp_polkadot::PARAS_PALLET_NAME;
 
-	/// The Polkadot Chain network ID.
-	pub const PolkadotNetwork: NetworkId = Polkadot;
 	/// Chain identifier of Polkadot Bridge Hub.
 	pub const BridgeHubPolkadotChainId: ChainId = bp_runtime::BRIDGE_HUB_POLKADOT_CHAIN_ID;
 	/// A number of Polkadot Bridge Hub head digests that we keep in the storage.
@@ -80,6 +78,51 @@ parameter_types! {
 	pub NeverSentMessage: Option<Xcm<()>> = None;
 }
 
+/// Bridged chain global consensus network.
+pub struct BridgedNetwork;
+
+impl sp_runtime::traits::Get<NetworkId> for BridgedNetwork {
+	#[cfg(not(feature = "rococo"))]
+	fn get() -> NetworkId {
+		Polkadot
+	}
+
+	#[cfg(feature = "rococo")]
+	fn get() -> NetworkId {
+		Rococo
+	}
+}
+
+/// Bridge Hub at the other side, which may be a Rococo Bridge Hub, or a Polkadot Bridge Hub.
+pub struct BridgeHubPolkadotOrRococo;
+
+impl bp_runtime::Chain for BridgeHubPolkadotOrRococo {
+	type BlockNumber = bp_runtime::BlockNumberOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Hash = bp_runtime::HashOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Hasher = bp_runtime::HasherOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Header = bp_runtime::HeaderOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+
+	type AccountId = bp_runtime::AccountIdOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Balance = bp_runtime::BalanceOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Nonce = bp_runtime::NonceOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+	type Signature = bp_runtime::SignatureOf<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+
+	fn max_extrinsic_size() -> u32 {
+		bp_bridge_hub_polkadot::BridgeHubPolkadot::max_extrinsic_size()
+	}
+
+	fn max_extrinsic_weight() -> Weight {
+		bp_bridge_hub_polkadot::BridgeHubPolkadot::max_extrinsic_weight()
+	}
+}
+
+impl bp_runtime::Parachain for BridgeHubPolkadotOrRococo {
+	#[cfg(not(feature = "rococo"))]
+	const PARACHAIN_ID: u32 = bp_bridge_hub_polkadot::BridgeHubPolkadot::PARACHAIN_ID;
+	#[cfg(feature = "rococo")]
+	const PARACHAIN_ID: u32 = bp_bridge_hub_rococo::BridgeHubRococo::PARACHAIN_ID;
+}
+
 /// An instance of `pallet_bridge_grandpa` used to bridge with Polkadot.
 pub type WithPolkadotBridgeGrandpaInstance = ();
 /// An instance of `pallet_bridge_parachains` used to bridge with Polkadot.
@@ -103,7 +146,7 @@ impl pallet_bridge_parachains::Config<WithPolkadotBridgeParachainsInstance> for 
 	type BridgesGrandpaPalletInstance = WithPolkadotBridgeGrandpaInstance;
 	type ParasPalletName = AtPolkadotParasPalletName;
 	type ParaStoredHeaderDataBuilder =
-		SingleParaStoredHeaderDataBuilder<bp_bridge_hub_polkadot::BridgeHubPolkadot>;
+		SingleParaStoredHeaderDataBuilder<BridgeHubPolkadotOrRococo>;
 	type HeadsToKeep = BridgeHubPolkadotHeadsToKeep;
 	type MaxParaHeadDataSize = MaxPolkadotBrdgeHubHeadSize;
 }
@@ -143,7 +186,7 @@ pub struct WithBridgeHubPolkadotMessageBridge;
 pub type BridgeHubPolkadotHeadersProvider = pallet_bridge_parachains::ParachainHeaders<
 	Runtime,
 	WithPolkadotBridgeParachainsInstance,
-	bp_bridge_hub_polkadot::BridgeHubPolkadot,
+	BridgeHubPolkadotOrRococo,
 >;
 
 impl MessageBridge for WithBridgeHubPolkadotMessageBridge {
@@ -159,7 +202,7 @@ impl MessageBridge for WithBridgeHubPolkadotMessageBridge {
 pub struct BridgeHubPolkadot;
 
 impl UnderlyingChainProvider for BridgeHubPolkadot {
-	type Chain = bp_bridge_hub_polkadot::BridgeHubPolkadot;
+	type Chain = BridgeHubPolkadotOrRococo;
 }
 
 impl BridgedChainWithMessages for BridgeHubPolkadot {}
@@ -218,7 +261,7 @@ pub type FromBridgeHubPolkadotBlobDispatcher = crate::xcm_config::ImmediateXcmDi
 
 /// Export XCM messages to be relayed to the Polkadot Bridge Hub chain.
 pub type ToBridgeHubPolkadotHaulBlobExporter =
-	HaulBlobExporter<XcmBlobHaulerAdapter<ToBridgeHubPolkadotXcmBlobHauler>, PolkadotNetwork, ()>;
+	HaulBlobExporter<XcmBlobHaulerAdapter<ToBridgeHubPolkadotXcmBlobHauler>, BridgedNetwork, ()>;
 
 /// Messages pallet adapter to use by XCM blob hauler.
 pub struct ToBridgeHubPolkadotXcmBlobHauler;
@@ -308,7 +351,7 @@ pub mod benchmarking {
 		fn parachains() -> Vec<bp_polkadot_core::parachains::ParaId> {
 			use bp_runtime::Parachain;
 			vec![bp_polkadot_core::parachains::ParaId(
-				bp_bridge_hub_polkadot::BridgeHubPolkadot::PARACHAIN_ID,
+				BridgeHubPolkadotOrRococo::PARACHAIN_ID,
 			)]
 		}
 
@@ -433,7 +476,7 @@ pub(crate) mod tests {
 	) -> (bp_polkadot::Hash, ParaHeadsProof) {
 		let (state_root, proof, _) =
 			bp_test_utils::prepare_parachain_heads_proof::<bp_polkadot::Header>(vec![(
-				bp_bridge_hub_polkadot::BridgeHubPolkadot::PARACHAIN_ID,
+				BridgeHubPolkadotOrRococo::PARACHAIN_ID,
 				ParaHead(bridge_hub_polkadot_header(t).encode()),
 			)]);
 		(state_root, proof)
@@ -599,7 +642,7 @@ pub(crate) mod tests {
 				pallet_bridge_parachains::Call::submit_parachain_heads {
 					at_relay_block: (POLKADOT_HEADER_NUMBER, polkadot_header(t).hash()),
 					parachains: vec![(
-						bp_bridge_hub_polkadot::BridgeHubPolkadot::PARACHAIN_ID.into(),
+						BridgeHubPolkadotOrRococo::PARACHAIN_ID.into(),
 						bridge_hub_polkadot_header(t).hash(),
 					)],
 					parachain_heads_proof: bridge_hub_polkadot_head_storage_proof(t).1,

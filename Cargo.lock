@@ -715,6 +715,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bp-bridge-hub-rococo"
+version = "0.1.0"
+dependencies = [
+ "bp-bridge-hub-cumulus",
+ "bp-messages",
+ "bp-runtime",
+ "frame-support",
+ "sp-api",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "bp-header-chain"
 version = "0.1.0"
 dependencies = [
@@ -5622,6 +5635,7 @@ name = "polkadot-bulletin-chain-runtime"
 version = "0.1.0-dev"
 dependencies = [
  "bp-bridge-hub-polkadot",
+ "bp-bridge-hub-rococo",
  "bp-header-chain",
  "bp-messages",
  "bp-parachains",

@@ -17,8 +17,8 @@
 //! XCM configuration for Polkadot Bulletin chain.
 
 use crate::{
-	bridge_config::ToBridgeHubPolkadotHaulBlobExporter, AllPalletsWithSystem, RuntimeCall,
-	RuntimeOrigin,
+	bridge_config::{BridgedNetwork, ToBridgeHubPolkadotHaulBlobExporter},
+	AllPalletsWithSystem, RuntimeCall, RuntimeOrigin,
 };
 
 use bridge_runtime_common::messages_xcm_extension::XcmAsPlainPayload;
@@ -28,7 +28,7 @@ use frame_support::{
 	traits::{Contains, Everything, Nothing, ProcessMessageError},
 	weights::Weight,
 };
-use sp_core::ConstU32;
+use sp_core::{ConstU32, Get};
 use sp_io::hashing::blake2_256;
 use xcm::{latest::prelude::*, VersionedInteriorMultiLocation, VersionedXcm, MAX_XCM_DECODE_DEPTH};
 use xcm_builder::{
@@ -42,7 +42,7 @@ use xcm_executor::{
 
 // TODO [bridge]: change to actual value here + everywhere where Kawabunga is mentioned
 /// Id of the Polkadot parachain that we are going to bridge with.
-const KAWABUNGA_PARACHAIN_ID: u32 = 42;
+const KAWABUNGA_PARACHAIN_ID: u32 = 1004;
 
 parameter_types! {
 	// TODO [bridge]: how we are supposed to set it? Named? ByGenesis - if so, when? After generating
@@ -54,7 +54,7 @@ parameter_types! {
 
 	/// Location of the Kawabunga parachain, relative to this runtime.
 	pub KawabungaLocation: MultiLocation = MultiLocation::new(1, X2(
-		GlobalConsensus(Polkadot),
+		GlobalConsensus(BridgedNetwork::get()),
 		Parachain(KAWABUNGA_PARACHAIN_ID),
 	));
 
@@ -65,22 +65,28 @@ parameter_types! {
 	pub const MaxInstructions: u32 = 100;
 }
 
-match_types! {
-	// Only contains Kawabunga parachain location.
-	pub type OnlyKawabungaLocation: impl Contains<MultiLocation> = {
-		MultiLocation { parents: 1, interior: X2(
-			GlobalConsensus(Polkadot),
-			Parachain(KAWABUNGA_PARACHAIN_ID),
-		) }
-	};
+pub struct OnlyKawabungaLocation;
 
-	// Supported universal aliases.
-	pub type UniversalAliases: impl Contains<(MultiLocation, Junction)> = {
-		(
-			MultiLocation { parents: 0, interior: Here },
-			GlobalConsensus(Polkadot),
-		)
-	};
+impl Contains<MultiLocation> for OnlyKawabungaLocation {
+	fn contains(l: &MultiLocation) -> bool {
+		matches!(*l, MultiLocation { parents: 1, interior: X2(
+			GlobalConsensus(bridged_network),
+			Parachain(KAWABUNGA_PARACHAIN_ID),
+		) } if bridged_network == BridgedNetwork::get())
+	}
+}
+
+pub struct UniversalAliases;
+
+impl Contains<(MultiLocation, Junction)> for UniversalAliases {
+	fn contains(l: &(MultiLocation, Junction)) -> bool {
+		matches!(
+			*l,
+			(
+				origin_location,
+				GlobalConsensus(bridged_network),
+			) if origin_location == KawabungaLocation::get() && bridged_network == BridgedNetwork::get())
+	}
 }
 
 /// Kawabunga location converter to local root.
@@ -102,9 +108,9 @@ impl ConvertOrigin<RuntimeOrigin> for KawabungaParachainAsRoot {
 				OriginKind::Superuser,
 				MultiLocation {
 					parents: 1,
-					interior: X2(GlobalConsensus(Polkadot), Parachain(KAWABUNGA_PARACHAIN_ID)),
+					interior: X2(GlobalConsensus(bridged_network), Parachain(KAWABUNGA_PARACHAIN_ID)),
 				},
-			) => Ok(RuntimeOrigin::root()),
+			) if bridged_network == BridgedNetwork::get() => Ok(RuntimeOrigin::root()),
 			(_, origin) => Err(origin),
 		}
 	}

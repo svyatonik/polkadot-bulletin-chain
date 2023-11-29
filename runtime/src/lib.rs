@@ -751,7 +751,7 @@ impl_runtime_apis! {
 	impl bp_bridge_hub_polkadot::BridgeHubPolkadotFinalityApi<Block> for Runtime {
 		fn best_finalized() -> Option<bp_runtime::HeaderId<bp_bridge_hub_polkadot::Hash, bp_bridge_hub_polkadot::BlockNumber>> {
 			BridgePolkadotParachains::best_parachain_head_id::<
-				bp_bridge_hub_polkadot::BridgeHubPolkadot
+				bridge_config::BridgeHubPolkadotOrRococo
 			>().unwrap_or(None)
 		}
 	}
