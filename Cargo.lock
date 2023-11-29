@@ -5653,6 +5653,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "frame-try-runtime",
  "hex",
+ "hex-literal",
  "log",
  "pallet-authorship",
  "pallet-babe",
