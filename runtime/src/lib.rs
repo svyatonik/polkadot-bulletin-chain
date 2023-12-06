@@ -55,7 +55,6 @@ pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
 mod bridge_config;
-mod messages_generator;
 mod weights;
 mod xcm_config;
 
@@ -369,8 +368,6 @@ where
 	type OverarchingCall = RuntimeCall;
 }
 
-impl messages_generator::Config for Runtime {}
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime {
@@ -392,8 +389,6 @@ construct_runtime!(
 		BridgePolkadotGrandpa: pallet_bridge_grandpa,
 		BridgePolkadotParachains: pallet_bridge_parachains,
 		BridgePolkadotMessages: pallet_bridge_messages,
-		// Generate test messages
-		GenerateTestMessages: messages_generator::{Pallet} = 100,
 	}
 );
 
