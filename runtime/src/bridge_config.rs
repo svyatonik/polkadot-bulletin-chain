@@ -267,15 +267,6 @@ impl XcmBlobHauler for ToBridgeHubPolkadotXcmBlobHauler {
 	type UncongestedMessage = NeverSentMessage;
 }
 
-/// Ensure that the account provided is the whitelisted relayer account.
-pub fn ensure_whitelisted_relayer(who: &AccountId) -> TransactionValidity {
-	if !WhitelistedRelayers::get().contains(who) {
-		return Err(InvalidTransaction::BadSigner.into())
-	}
-
-	Ok(Default::default())
-}
-
 #[cfg(feature = "runtime-benchmarks")]
 pub mod benchmarking {
 	use super::*;
