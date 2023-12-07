@@ -73,7 +73,7 @@ struct Validator<BlockNumber> {
 	min_set_keys_block: BlockNumber,
 }
 
-#[frame_support::pallet()]
+#[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
@@ -248,15 +248,14 @@ impl<T: Config> Pallet<T> {
 		{
 			log::trace!(
 				target: LOG_TARGET,
-				"Failed to purge session keys for validator {:?}: {:?}", who, err
+				"Failed to purge session keys for validator {who:?}: {err:?}"
 			);
 		}
 		if let Err(err) = frame_system::Pallet::<T>::dec_providers(who) {
 			log::warn!(
 				target: LOG_TARGET,
-				"Failed to decrement provider reference count for validator {:?}, \
-				leaking reference: {:?}",
-				who, err
+				"Failed to decrement provider reference count for validator {who:?}, \
+				leaking reference: {err:?}"
 			);
 		}
 

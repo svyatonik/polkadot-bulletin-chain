@@ -1,4 +1,3 @@
-// Copyright (C) Gautam Dhameja.
 // Copyright (C) Parity Technologies (UK) Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -16,7 +15,7 @@
 
 #![cfg(feature = "runtime-benchmarks")]
 
-use super::{Pallet as ValidatorSet, *};
+use super::{Pallet as RelayerSet, *};
 use frame_benchmarking::v2::{account, benchmarks, impl_benchmark_test_suite, vec, BenchmarkError};
 use frame_support::traits::EnsureOrigin;
 use frame_system::{EventRecord, Pallet as System};
@@ -35,33 +34,33 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn add_validator() -> Result<(), BenchmarkError> {
+	fn add_relayer() -> Result<(), BenchmarkError> {
 		let origin = T::AddRemoveOrigin::try_successful_origin()
 			.map_err(|_| BenchmarkError::Stop("unable to compute origin"))?;
-		let who: T::AccountId = account("validator", 0, SEED);
+		let who: T::AccountId = account("relayer", 0, SEED);
 
 		#[extrinsic_call]
 		_(origin as T::RuntimeOrigin, who.clone());
 
-		assert_last_event::<T>(Event::ValidatorAdded(who).into());
+		assert_last_event::<T>(Event::RelayerAdded(who).into());
 		Ok(())
 	}
 
 	#[benchmark]
-	fn remove_validator() -> Result<(), BenchmarkError> {
+	fn remove_relayer() -> Result<(), BenchmarkError> {
 		let origin = T::AddRemoveOrigin::try_successful_origin()
 			.map_err(|_| BenchmarkError::Stop("unable to compute origin"))?;
-		let who: T::AccountId = account("validator", 0, SEED);
+		let who: T::AccountId = account("relayer", 0, SEED);
 
-		ValidatorSet::<T>::add_validator(origin.clone(), who.clone())
-			.map_err(|_| BenchmarkError::Stop("unable to add validator"))?;
+		RelayerSet::<T>::add_relayer(origin.clone(), who.clone())
+			.map_err(|_| BenchmarkError::Stop("unable to add relayer"))?;
 
 		#[extrinsic_call]
 		_(origin as T::RuntimeOrigin, who.clone());
 
-		assert_last_event::<T>(Event::ValidatorRemoved(who).into());
+		assert_last_event::<T>(Event::RelayerRemoved(who).into());
 		Ok(())
 	}
 
-	impl_benchmark_test_suite!(ValidatorSet, crate::mock::new_test_ext(), crate::mock::Test);
+	impl_benchmark_test_suite!(RelayerSet, crate::mock::new_test_ext(), crate::mock::Test);
 }
