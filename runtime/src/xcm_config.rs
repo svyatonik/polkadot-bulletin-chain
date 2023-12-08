@@ -159,18 +159,6 @@ impl<RuntimeCall: Decode, AllowedOrigin: Contains<MultiLocation>> ShouldExecute
 		// we only allow from configured origins
 		ensure!(AllowedOrigin::contains(origin), ProcessMessageError::Unsupported);
 
-		// we expect an XCM program with single `Transact` call
-		instructions
-			.matcher()
-			.assert_remaining_insts(1)?
-			.match_next_inst(|inst| match inst {
-				Transact { origin_kind: OriginKind::Superuser, .. } => {
-					// we allow all calls through the bridge
-					Ok(())
-				},
-				_ => Err(ProcessMessageError::BadFormat),
-			})?;
-
 		Ok(())
 	}
 }
